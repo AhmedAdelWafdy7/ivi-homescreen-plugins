@@ -15,7 +15,20 @@
 #
 
 find_package(PkgConfig REQUIRED)
+find_package(SQLite3 REQUIRED)
 pkg_check_modules(FLATPAK_DEPS IMPORTED_TARGET REQUIRED flatpak libxml-2.0 zlib)
+
+file(GLOB CACHE_SOURCES "../cache/*.cc")
+file(GLOB CACHE_STORAGE_SOURCES "../cache/storage/*.cc")
+file(GLOB CACHE_NETWORK_SOURCES "../cache/network/*.cc")
+file(GLOB CACHE_OBSERVER_SOURCES "../cache/observer/*.cc")
+
+set(ALL_CACHE_SOURCES
+        ${CACHE_SOURCES}
+        ${CACHE_STORAGE_SOURCES}
+        ${CACHE_NETWORK_SOURCES}
+        ${CACHE_OBSERVER_SOURCES}
+)
 
 add_library(plugin_flatpak STATIC
         flatpak_plugin_c_api.cc
@@ -28,12 +41,18 @@ add_library(plugin_flatpak STATIC
         icon.cc
         release.cc
         screenshot.cc
+        ${ALL_CACHE_SOURCES}
 )
 
-target_include_directories(plugin_flatpak PRIVATE include)
+target_include_directories(plugin_flatpak PRIVATE include cache/operations)
 
 target_link_libraries(plugin_flatpak PUBLIC
         PkgConfig::FLATPAK_DEPS
+        plugin_common_curl
         flutter
         platform_homescreen
+        SQLite::SQLite3
 )
+
+enable_testing()
+add_subdirectory(test)

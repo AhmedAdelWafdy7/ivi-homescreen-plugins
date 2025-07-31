@@ -64,8 +64,12 @@ FlatpakPlugin::FlatpakPlugin()
   }
 }
 
-FlatpakPlugin::~FlatpakPlugin() = default;
-
+FlatpakPlugin::~FlatpakPlugin() {
+  io_context_->stop();
+  if (thread_.joinable()) {
+    thread_.join();
+  }
+}
 // Get Flatpak Version
 ErrorOr<std::string> FlatpakPlugin::GetVersion() {
   std::stringstream ss;
@@ -372,6 +376,83 @@ ErrorOr<flutter::EncodableList> FlatpakPlugin::GetApplicationsRemote(
   return flutter::EncodableList();
 }
 
+ErrorOr<flutter::EncodableList> FlatpakPlugin::GetRemotesByInstallationId(
+    const std::string& installation_id) {
+  try {
+    FlatpakInstallation* installation = nullptr;
+
+    // check user installation
+    if (installation_id == "user") {
+      GError* error = nullptr;
+      installation = flatpak_installation_new_user(nullptr, &error);
+      if (error) {
+        std::string error_msg = error->message;
+        g_clear_error(&error);
+        return ErrorOr<flutter::EncodableList>(
+            FlutterError("INSTALLATION_ERROR",
+                         "Failed to get user installation: " + error_msg));
+      }
+    } else {
+      // check system installations
+      const auto system_installations = get_system_installations();
+      if (!system_installations) {
+        return ErrorOr<flutter::EncodableList>(
+            FlutterError("NO_INSTALLATIONS", "No system installation found"));
+      }
+
+      for (size_t i = 0; i < system_installations->len; i++) {
+        auto* sys_installation = static_cast<FlatpakInstallation*>(
+            g_ptr_array_index(system_installations, i));
+
+        const auto id = flatpak_installation_get_id(sys_installation);
+        if (id && installation_id == std::string(id)) {
+          installation =
+              static_cast<FlatpakInstallation*>(g_object_ref(sys_installation));
+          break;
+        }
+      }
+
+      g_ptr_array_unref(system_installations);
+
+      if (!installation) {
+        return ErrorOr<flutter::EncodableList>(FlutterError(
+            "INSTALLATION_NOT_FOUND",
+            "Installation with ID '" + installation_id + "' not found"));
+      }
+    }
+
+    if (!installation) {
+      return ErrorOr<flutter::EncodableList>(
+          FlutterError("INSTALLATION_ERROR", "Failed to get installation"));
+    }
+
+    // get remotes for this installation
+    GPtrArray* remotes = get_remotes(installation);
+    if (!remotes) {
+      g_object_unref(installation);
+      return flutter::EncodableList{};
+    }
+
+    // convert remotes to encodablelist
+    flutter::EncodableList remote_list =
+        convert_remotes_to_EncodableList(remotes);
+
+    g_ptr_array_unref(remotes);
+    g_object_unref(installation);
+
+    spdlog::debug(
+        "[FlatpakPlugin] Successfully retrieved {} remotes for installation "
+        "{} ",
+        remote_list.size(), installation_id);
+    return remote_list;
+  } catch (const std::exception& e) {
+    spdlog::error("[FlatpakPlugin] Exception occured while getting remotes]",
+                  e.what());
+    return ErrorOr<flutter::EncodableList>(FlutterError(
+        "UNKNOWN_ERROR", "Failed to get remotes: " + std::string(e.what())));
+  }
+}
+
 ErrorOr<bool> FlatpakPlugin::ApplicationInstall(const std::string& /* id */) {
   spdlog::info("[FlatpakPlugin] Not Implemented: {}", __FUNCTION__);
   return true;
@@ -515,6 +596,79 @@ flutter::EncodableMap FlatpakPlugin::get_content_rating_map(
     result[flutter::EncodableValue(static_cast<char*>(key))] =
         flutter::EncodableValue(static_cast<char*>(value));
   }
+  return result;
+}
+
+flutter::EncodableList FlatpakPlugin::convert_remotes_to_EncodableList(
+    GPtrArray* remotes) {
+  flutter::EncodableList result;
+
+  if (!remotes) {
+    spdlog::warn("[FlatpakPlugin] Received null remotes array");
+    return result;
+  }
+
+  for (size_t j = 0; j < remotes->len; j++) {
+    const auto remote =
+        static_cast<FlatpakRemote*>(g_ptr_array_index(remotes, j));
+    if (!remote) {
+      spdlog::warn("[FlatpakPlugin] Null remote at index {}", j);
+      continue;
+    }
+    try {
+      const auto name = flatpak_remote_get_name(remote);
+      const auto url = flatpak_remote_get_url(remote);
+      const auto collection_id = flatpak_remote_get_collection_id(remote);
+      const auto title = flatpak_remote_get_title(remote);
+      const auto comment = flatpak_remote_get_comment(remote);
+      const auto description = flatpak_remote_get_description(remote);
+      const auto homepage = flatpak_remote_get_homepage(remote);
+      const auto icon = flatpak_remote_get_icon(remote);
+      const auto default_branch = flatpak_remote_get_default_branch(remote);
+      const auto main_ref = flatpak_remote_get_main_ref(remote);
+      const auto filter = flatpak_remote_get_filter(remote);
+      const bool gpg_verify = flatpak_remote_get_gpg_verify(remote);
+      const bool no_enumerate = flatpak_remote_get_noenumerate(remote);
+      const bool no_deps = flatpak_remote_get_nodeps(remote);
+      const bool disabled = flatpak_remote_get_disabled(remote);
+      int32_t prio = flatpak_remote_get_prio(remote);
+
+      const auto default_arch = flatpak_get_default_arch();
+      auto appstream_timestamp_path = g_file_get_path(
+          flatpak_remote_get_appstream_timestamp(remote, default_arch));
+      auto appstream_dir_path = g_file_get_path(
+          flatpak_remote_get_appstream_dir(remote, default_arch));
+
+      auto appstream_timestamp =
+          get_appstream_timestamp(appstream_timestamp_path);
+      char formatted_time[30];
+      format_time_iso8601(appstream_timestamp, formatted_time,
+                          sizeof(formatted_time));
+
+      result.emplace_back(flutter::CustomEncodableValue(Remote(
+          name ? name : "", url ? url : "", collection_id ? collection_id : "",
+          title ? title : "", comment ? comment : "",
+          description ? description : "", homepage ? homepage : "",
+          icon ? icon : "", default_branch ? default_branch : "",
+          main_ref ? main_ref : "",
+          FlatpakRemoteTypeToString(flatpak_remote_get_remote_type(remote)),
+          filter ? filter : "", formatted_time,
+          appstream_dir_path ? appstream_dir_path : "", gpg_verify,
+          no_enumerate, no_deps, disabled, static_cast<int64_t>(prio))));
+
+      if (appstream_timestamp_path) {
+        g_free(appstream_timestamp_path);
+      }
+
+      if (appstream_dir_path) {
+        g_free(appstream_dir_path);
+      }
+    } catch (const std::exception& e) {
+      spdlog::error("[FlatpakPlugin] Received exception {}", e.what());
+    }
+  }
+  spdlog::debug("[FlatpakPlugin] Converted {} remotes to encodable list ",
+                result.size());
   return result;
 }
 

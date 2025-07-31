@@ -165,6 +165,7 @@ class Remote {
   [[nodiscard]] flutter::EncodableList ToEncodableList() const;
   friend class FlatpakApi;
   friend class PigeonInternalCodecSerializer;
+  friend class CacheManager;
   std::string name_;
   std::string url_;
   std::string collection_id_;
@@ -329,6 +330,7 @@ class Installation {
   [[nodiscard]] flutter::EncodableList ToEncodableList() const;
   friend class FlatpakApi;
   friend class PigeonInternalCodecSerializer;
+  friend class CacheManager;
   std::string id_;
   std::string display_name_;
   std::string path_;

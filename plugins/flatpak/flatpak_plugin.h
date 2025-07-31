@@ -65,6 +65,10 @@ class FlatpakPlugin final : public flutter::Plugin, public FlatpakApi {
   ErrorOr<flutter::EncodableList> GetApplicationsRemote(
       const std::string& id) override;
 
+  // Get remotes by installation ID.
+  ErrorOr<flutter::EncodableList> GetRemotesByInstallationId(
+      const std::string& installation_id);
+
   // Install application of given id.
   ErrorOr<bool> ApplicationInstall(const std::string& id) override;
 
@@ -134,6 +138,9 @@ class FlatpakPlugin final : public flutter::Plugin, public FlatpakApi {
                                    flutter::EncodableList& application_list);
 
   static flutter::EncodableMap get_content_rating_map(FlatpakInstalledRef* ref);
+
+  static flutter::EncodableList convert_remotes_to_EncodableList(
+      GPtrArray* remotes);
 };
 }  // namespace flatpak_plugin
 

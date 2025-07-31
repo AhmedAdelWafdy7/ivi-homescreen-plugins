@@ -17,30 +17,24 @@
 #ifndef PLUGINS_FLATPAK_CACHE_CACHE_MANAGER_H
 #define PLUGINS_FLATPAK_CACHE_CACHE_MANAGER_H
 
-#include <spdlog/spdlog.h>
-#include <sqlite3.h>
+#include <flutter/encodable_value.h>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
-#include <cstddef>
 #include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <shared_mutex>
 #include <string>
 #include <thread>
 #include <vector>
-#include "../../common/curl_client/curl_client.h"
+#include "../messages.g.h"
 #include "cache_config.h"
 #include "interfaces/cache_observer.h"
 #include "interfaces/cache_storage.h"
 #include "interfaces/network_fetcher.h"
 #include "operations/cache_operation_template.h"
-
-namespace flutter {
-using EncodableList = std::vector<int>;  // Dummy type for testing
-}
-struct Installation {};  // Dummy struct for testing
 
 namespace flatpak_plugin {
 
@@ -55,8 +49,8 @@ class CacheManager {
   std::unique_ptr<INetworkFetcher> network_fetcher_;
   std::vector<std::unique_ptr<ICacheObserver>> observers_;
   CacheConfig config_;
-  mutable std::mutex cache_mutex_;
-
+  mutable std::shared_mutex cache_mutex_;
+  bool is_initialized_ = false;
   std::thread cleanup_thread_;
   std::atomic<bool> stop_cleanup_{false};
   std::condition_variable cleanup_cv_;
@@ -77,6 +71,111 @@ class CacheManager {
       const std::string& key,
       std::function<std::optional<T>()> network_operation,
       CacheOperationTemplate<T>* cache_operation);
+
+  template <typename T>
+  std::optional<T> TryNetworkOperation(
+      const std::string& key,
+      std::function<std::optional<T>()> network_operation);
+
+  template <typename T>
+  std::optional<T> TryNetworkAndCache(
+      const std::string& key,
+      std::function<std::optional<T>()> network_operation,
+      CacheOperationTemplate<T>* cache_operation);
+
+  static std::string SerializeInstallation(
+      const flatpak_plugin::Installation& installation);
+
+  static flatpak_plugin::Installation DeserializeInstallation(
+      const std::string& data);
+
+  static std::string SerializeEncodableList(flutter::EncodableValue list);
+
+  static flutter::EncodableList DeserializeEncodableList(
+      const std::string& data);
+
+  flutter::EncodableList ConvertApplicationsToEncodableList(
+      const flutter::EncodableList& apps);
+
+  struct AppCacheOperation : CacheOperationTemplate<flutter::EncodableList> {
+    CacheManager* manager;
+
+    AppCacheOperation(CacheManager* manager) : manager(manager) {}
+
+   protected:
+    bool ValidateKey(const std::string& key) override { return !key.empty(); }
+    std::string SerializeData(const flutter::EncodableList& data) override {
+      try {
+        flutter::EncodableValue encodable_value;
+        encodable_value = flutter::EncodableList(data);
+        return manager->SerializeEncodableList(encodable_value);
+      } catch (const std::exception& e) {
+        spdlog::error("Error serializing data: {}", e.what());
+        return "";
+      }
+    }
+
+    std::optional<flutter::EncodableList> DeserializeData(
+        const std::string& serialized_data) override {
+      if (serialized_data.empty()) {
+        return std::nullopt;
+      }
+      try {
+        return manager->DeserializeEncodableList(serialized_data);
+      } catch (const std::exception& e) {
+        spdlog::error("Error deserializing data: {}", e.what());
+        return std::nullopt;
+      }
+    }
+
+    std::chrono::system_clock::time_point GetExpiryTime() override {
+      return std::chrono::system_clock::now() + manager->config_.default_ttl;
+    }
+
+    bool ValidateData(const flutter::EncodableList& data) override {
+      return true;
+    }
+  };
+
+  struct InstallationCacheOperation
+      : CacheOperationTemplate<flatpak_plugin::Installation> {
+    CacheManager* manager;
+    InstallationCacheOperation(CacheManager* manager) : manager(manager) {}
+
+   protected:
+    bool ValidateKey(const std::string& key) override { return !key.empty(); }
+
+    std::string SerializeData(
+        const flatpak_plugin::Installation& data) override {
+      try {
+        return manager->SerializeInstallation(data);
+      } catch (const std::exception& e) {
+        spdlog::error("Error serializing data: {}", e.what());
+        return "";
+      }
+    }
+
+    std::optional<flatpak_plugin::Installation> DeserializeData(
+        const std::string& data) override {
+      if (data.empty()) {
+        return std::nullopt;
+      }
+      try {
+        return manager->DeserializeInstallation(data);
+      } catch (const std::exception& e) {
+        spdlog::error("Error deserializing data: {}", e.what());
+        return std::nullopt;
+      }
+    }
+
+    std::chrono::system_clock::time_point GetExpiryTime() override {
+      return std::chrono::system_clock::now() + manager->config_.default_ttl;
+    }
+
+    bool ValidateData(const flatpak_plugin::Installation& data) override {
+      return !data.id().empty();
+    }
+  };
 
  public:
   class Builder {
@@ -136,6 +235,10 @@ class CacheManager {
   };
 
   explicit CacheManager(const CacheConfig& config);
+
+  CacheManager(const CacheConfig& config,
+               std::unique_ptr<ICacheStorage> storage,
+               std::unique_ptr<INetworkFetcher> fetcher);
 
   ~CacheManager();
 
@@ -258,6 +361,7 @@ class CacheManager {
    */
   const CacheConfig& GetConfig() const;
 
+ public:
   /**
    * @brief Export cache to file
    * @param filepath Path to export file
@@ -272,7 +376,7 @@ class CacheManager {
    */
   bool ImportCache(const std::string& filepath);
 
-  CacheMetrics* GetMetricsPtr() { return &metrics_; }
+  CacheMetrics* GetMetricsPtr() const { return &metrics_; }
 };
 
 }  // namespace flatpak_plugin

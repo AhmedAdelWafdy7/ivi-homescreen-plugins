@@ -136,6 +136,28 @@ void CurlNetworkFetcher::SetBearerToken(const std::string& token) {
   curl_client_->SetBearerToken(token);
 }
 
+std::optional<flutter::EncodableList> CurlNetworkFetcher::FetchRemotes(
+    const std::string& installation_id) {
+  std::unique_ptr<flatpak_plugin::FlatpakPlugin> plugin_;
+  try {
+    plugin_ = std::make_unique<flatpak_plugin::FlatpakPlugin>();
+
+    // Get installation
+    auto installation_result =
+        plugin_->GetRemotesByInstallationId(installation_id);
+    if (installation_result.has_error()) {
+      spdlog::error("[Network Fetcher] Error fetching remotes : {}",
+                    installation_result.error().message());
+      return std::nullopt;
+    }
+
+    return installation_result.value();
+  } catch (const std::exception& e) {
+    spdlog::error("Network operation failed: {}", e.what());
+    return std::nullopt;
+  }
+}
+
 void CurlNetworkFetcher::ProcessHeaders(
     const std::vector<std::string>& headers,
     std::vector<std::string>& non_auth_headers) {

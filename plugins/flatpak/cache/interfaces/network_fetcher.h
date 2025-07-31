@@ -80,6 +80,14 @@ class INetworkFetcher {
    *              An empty string will clear any previously set token.
    */
   virtual void SetBearerToken(const std::string& token) = 0;
+
+  /**
+   * @brief Interface function that fetches remotes over the network.
+   * @param installation_id id of the installation in remote
+   * @return Encodablelist contains Remote data of installation
+   */
+  virtual std::optional<flutter::EncodableList> FetchRemotes(
+      const std::string& installation_id) = 0;
 };
 
 #endif  // PLUGINS_FLATPAK_CACHE_NETWORK_FETCHER_H

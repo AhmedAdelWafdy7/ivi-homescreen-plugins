@@ -17,6 +17,8 @@
 #ifndef PLUGINS_FLATPAK_CACHE_CURL_NETWORK_FETCHER_H
 #define PLUGINS_FLATPAK_CACHE_CURL_NETWORK_FETCHER_H
 
+#include <../flatpak_plugin.h>
+#include <encodable_value.h>
 #include <spdlog/spdlog.h>
 #include <atomic>
 #include <chrono>
@@ -85,6 +87,9 @@ class CurlNetworkFetcher : public INetworkFetcher {
   long GetLastResponseCode() override;
 
   void SetBearerToken(const std::string& token) override;
+
+  std::optional<flutter::EncodableList> FetchRemotes(
+      const std::string& installation_id) override;
 };
 
 #endif  // PLUGINS_FLATPAK_CACHE_CURL_NETWORK_FETCHER_H
