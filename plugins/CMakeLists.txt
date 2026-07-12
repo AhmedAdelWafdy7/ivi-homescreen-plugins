@@ -134,6 +134,7 @@ PLUGIN_OPTION(layer_playground_view "Include Layer Playground View plugin" OFF)
 PLUGIN_OPTION(nav_render_view "Include Navigation Render View plugin" OFF)
 
 PLUGIN_OPTION(webview_flutter_view "Includes WebView View Plugin" OFF)
+PLUGIN_OPTION(chromium_dart_view "Thin platform-view bridge to the chromium_dart FFI webview" OFF)
 
 
 #

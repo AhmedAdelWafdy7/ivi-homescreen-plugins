@@ -100,6 +100,10 @@ void PluginsApiRegisterPlugins(FlutterDesktopEngineRef engine) {
   WebviewFlutterPluginCApiRegisterWithRegistrar(
       FlutterDesktopGetPluginRegistrar(engine, ""));
 #endif
+#if ENABLE_PLUGIN_CHROMIUM_DART_VIEW
+  ChromiumDartViewPluginCApiRegisterWithRegistrar(
+      FlutterDesktopGetPluginRegistrar(engine, ""));
+#endif
 #if ENABLE_PLUGIN_FLATPAK
   FlatpakPluginCApiRegisterWithRegistrar(
       FlutterDesktopGetPluginRegistrar(engine, ""));
@@ -168,6 +172,15 @@ void PluginsAoiPlatformViewCreate(
 
   auto registrar = FlutterDesktopGetPluginRegistrar(engine, viewType.c_str());
 
+#if ENABLE_PLUGIN_CHROMIUM_DART_VIEW
+  if (viewType == "plugins.flutter.io/webview") {
+    ChromiumDartViewPluginCApiPlatformViewCreate(
+        registrar, id, viewType, direction, top, left, width, height, params,
+        flutter_asset_directory, engine, addListener, removeListener,
+        platform_view_context);
+    result->Success(flutter::EncodableValue(id));
+  } else
+#endif
 #if ENABLE_PLUGIN_WEBVIEW_FLUTTER_VIEW
   if (viewType == "plugins.flutter.io/webview") {
     WebviewFlutterPluginCApiPlatformViewCreate(
