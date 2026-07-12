@@ -129,5 +129,10 @@
 #include "webview_flutter_view/include/webview_flutter_view/webview_flutter_view_plugin_c_api.h"
 #endif
 
+#cmakedefine01 ENABLE_PLUGIN_CHROMIUM_DART_VIEW
+#if ENABLE_PLUGIN_CHROMIUM_DART_VIEW
+#include "chromium_dart_view/include/chromium_dart_view/chromium_dart_view_plugin_c_api.h"
+#endif
+
 
 #endif //CONFIG_PLUGINS_H_
