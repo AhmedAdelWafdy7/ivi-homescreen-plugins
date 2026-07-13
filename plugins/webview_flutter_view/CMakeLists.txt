@@ -38,7 +38,12 @@ add_compile_definitions(CEF_ROOT=\"${CEF_ROOT}\")
 
 set(WEBVIEW_SUBPROCESS_PROJECT_NAME "webview_flutter_subprocess")
 
-add_subdirectory(${CEF_ROOT})
+# CEF_ROOT is a Yocto-staged sysroot path (recipe-sysroot/usr/share/cef), out
+# of tree relative to this plugin's own source dir, so CMake requires an
+# explicit binary dir. The reference native build this integration follows
+# keeps CEF_ROOT in-tree under third_party/ (depot_tools-fetched), where the
+# default binary dir is implicit -- harmless for that layout too.
+add_subdirectory(${CEF_ROOT} ${CMAKE_CURRENT_BINARY_DIR}/cef)
 
 target_compile_definitions(plugin_webview_flutter_view PUBLIC
         MESA_EGL_NO_X11_HEADERS
