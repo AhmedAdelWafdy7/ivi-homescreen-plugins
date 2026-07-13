@@ -71,6 +71,15 @@ macro(ENABLE_PLUGIN plugin)
 
     add_subdirectory(${plugin})
 
+    # shell/wayland/*.h (pulled in transitively by any plugin touching the
+    # shell's Wayland layer) needs the wl/ header-only framework the shell
+    # itself gets via ivi_wayland_link() (cmake/wayland_cxx.cmake) -- plugins
+    # never called that. chromium_dart_view already links this explicitly
+    # itself; wire it for every plugin here instead of one at a time.
+    if (TARGET wayland-cxx::wayland-cxx)
+        target_link_libraries(plugin_${plugin} PRIVATE wayland-cxx::wayland-cxx)
+    endif ()
+
     target_compile_definitions(plugin_${plugin} PUBLIC ENABLE_PLUGIN_${ucase_plugin})
 
     add_sanitizers(plugin_${plugin})
