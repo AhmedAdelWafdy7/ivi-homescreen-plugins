@@ -51,8 +51,18 @@ add_subdirectory(${CEF_ROOT} ${CMAKE_CURRENT_BINARY_DIR}/cef)
 # cmake/compiler.cmake), which CEF's own build was never written against.
 # Disable just for this target rather than loosening the shell's warning
 # flags project-wide or patching CEF's own CMakeLists.txt.
+#
+# -stdlib=libc++: CEF's vendored cmake/cef_variables.cmake resets CXX flags
+# for its own subtree and never sets -stdlib on Linux at all (its only
+# stdlib knob, CEF_RUNTIME_LIBRARY_FLAG, defaults to "/MT" and is
+# Windows/MSVC-only) -- so without this, libcef_dll_wrapper silently falls
+# back to Clang's default (libstdc++) while the rest of this project is
+# libc++ (LIBCPLUSPLUS=-stdlib=libc++), and the final link fails with
+# undefined std::_Rb_tree_*/std::__throw_length_error symbols (an ABI mix,
+# not a missing dependency). libcef_dll_wrapper is a static archive, so only
+# its compile-time stdlib choice matters here -- no link flag needed on it.
 if (TARGET libcef_dll_wrapper)
-    target_compile_options(libcef_dll_wrapper PRIVATE -Wno-error -Wno-sign-conversion -Wno-conversion)
+    target_compile_options(libcef_dll_wrapper PRIVATE -Wno-error -Wno-sign-conversion -Wno-conversion -stdlib=libc++)
 endif ()
 
 target_compile_definitions(plugin_webview_flutter_view PUBLIC
