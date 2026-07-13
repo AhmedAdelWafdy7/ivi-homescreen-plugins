@@ -17,6 +17,14 @@
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
+# ENABLE_PLUGIN (below) calls target_link_libraries(plugin_${plugin} ...) from
+# this file's directory scope, but plugin_${plugin} targets are created inside
+# add_subdirectory(${plugin}) -- a different directory scope. CMake disallows
+# that without CMP0079 NEW. cmake/wayland_cxx.cmake sets this too, but policy
+# settings don't propagate across sibling add_subdirectory() scopes, only down
+# into children of wherever they're set -- set it here too.
+cmake_policy(SET CMP0079 NEW)
+
 include_directories(
         ${CMAKE_CURRENT_SOURCE_DIR}/..
         ${PROJECT_BINARY_DIR}/config
