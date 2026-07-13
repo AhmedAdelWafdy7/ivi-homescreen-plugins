@@ -34,7 +34,20 @@ add_library(plugin_webview_flutter_view STATIC
         messages.g.cc
 )
 
-add_compile_definitions(CEF_ROOT=\"${CEF_ROOT}\")
+# The CEF_ROOT macro baked into webview_flutter_view_plugin.cc is read at
+# RUNTIME (cef_user_data cache dir, Resources path) with no env-var override,
+# unlike chromium_dart's CHROMIUM_DART_CEF_ROOT. ${CEF_ROOT} (the CMake
+# variable) has to stay the build-time discovery path for everything else in
+# this file (add_subdirectory, -isystem, target_link_directories below) --
+# under a staged-sysroot build that's a build-host-only path that doesn't
+# exist on the target device. CEF_INSTALL_ROOT (set by the shell fork's
+# top-level CMakeLists.txt, or passed directly by the recipe) is the actual
+# on-target CEF location; fall back to CEF_ROOT unchanged when unset, same as
+# the shell's own default, for builds where the two are already the same.
+if (NOT DEFINED CEF_INSTALL_ROOT)
+    set(CEF_INSTALL_ROOT "${CEF_ROOT}")
+endif ()
+add_compile_definitions(CEF_ROOT=\"${CEF_INSTALL_ROOT}\")
 
 set(WEBVIEW_SUBPROCESS_PROJECT_NAME "webview_flutter_subprocess")
 
