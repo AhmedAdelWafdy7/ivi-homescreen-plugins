@@ -54,13 +54,6 @@ file(READ ${CMAKE_SOURCE_DIR}/shell/logging/logging.h _ihs_logging_h)
 string(FIND "${_ihs_logging_h}" "namespace ihs::log" _ihs_log_ns_pos)
 if (_ihs_log_ns_pos EQUAL -1)
     add_compile_definitions(IHS_LOG_SHIM=1)
-    # On this older codepath, shell/logging/logging.h #includes real spdlog
-    # headers unconditionally (spdlog/sinks/stdout_color_sinks.h etc.), so
-    # anything transitively including it needs spdlog's own include root too.
-    # third_party/CMakeLists.txt only exposes this via the `spdlog` INTERFACE
-    # target's own compile options (-isystem.../third_party/spdlog/include),
-    # and no plugin here links that target -- add the path directly instead.
-    include_directories(${CMAKE_SOURCE_DIR}/third_party/spdlog/include)
 endif ()
 
 find_package(PkgConfig REQUIRED)
