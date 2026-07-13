@@ -45,6 +45,16 @@ set(WEBVIEW_SUBPROCESS_PROJECT_NAME "webview_flutter_subprocess")
 # default binary dir is implicit -- harmless for that layout too.
 add_subdirectory(${CEF_ROOT} ${CMAKE_CURRENT_BINARY_DIR}/cef)
 
+# libcef_dll_wrapper is CEF's own generated/vendored code, built here in-tree
+# via the add_subdirectory() above -- it inherits this project's strict
+# -Wconversion -Wsign-conversion -Werror (set globally by the shell's own
+# cmake/compiler.cmake), which CEF's own build was never written against.
+# Disable just for this target rather than loosening the shell's warning
+# flags project-wide or patching CEF's own CMakeLists.txt.
+if (TARGET libcef_dll_wrapper)
+    target_compile_options(libcef_dll_wrapper PRIVATE -Wno-error -Wno-sign-conversion -Wno-conversion)
+endif ()
+
 target_compile_definitions(plugin_webview_flutter_view PUBLIC
         MESA_EGL_NO_X11_HEADERS
         WL_EGL_PLATFORM
