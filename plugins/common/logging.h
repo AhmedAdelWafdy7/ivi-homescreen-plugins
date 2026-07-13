@@ -23,27 +23,4 @@
 // SPDLOG_TRACE were). Previously this header configured and included spdlog.
 #include "logging/logging.h"
 
-// IHS_LOG_SHIM (set by plugins/CMakeLists.txt's shell/logging/logging.h text
-// probe) means this shell pin predates the ihs_shared rewrite: no
-// `namespace ihs::log`, no IHS_DEBUG/IHS_TRACE. shell/logging/logging.h at
-// these older pins still sets up spdlog directly (spdlog::info/warn/error/
-// trace/critical via the global default logger, LOG_*/DLOG_* macros) --
-// alias ihs::log onto it 1:1 (identical fmt-style format-string + args
-// signatures) so plugin code using ihs::log::* keeps working unchanged
-// against either shell generation.
-#if defined(IHS_LOG_SHIM)
-namespace ihs {
-namespace log {
-using namespace spdlog;
-}  // namespace log
-}  // namespace ihs
-
-#ifndef IHS_DEBUG
-#define IHS_DEBUG(...) SPDLOG_DEBUG(__VA_ARGS__)
-#endif
-#ifndef IHS_TRACE
-#define IHS_TRACE(...) SPDLOG_TRACE(__VA_ARGS__)
-#endif
-#endif  // IHS_LOG_SHIM
-
 #endif  // FLUTTER_PLUGIN_COMMON_LOGGING_H_

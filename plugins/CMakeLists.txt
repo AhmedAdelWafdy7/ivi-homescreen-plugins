@@ -41,21 +41,6 @@ include_directories(
         ${PROJECT_BINARY_DIR}/shell/wayland-protocols
 )
 
-# This plugins tree's common/ code calls ihs::log::{info,warn,error,...} and
-# IHS_DEBUG/IHS_TRACE, provided by shell/logging/logging.h -- but only on
-# shell pins past its spdlog-to-ihs_shared rewrite. Older pins (this one
-# included) still expose spdlog directly (spdlog::info/warn/error/... +
-# LOG_*/DLOG_* macros, see shell/logging/logging.h). Detect via a plain text
-# search (a real compile probe would need the same include/definition set as
-# the actual target, which is fragile to replicate here) and, if absent,
-# define IHS_LOG_SHIM so plugins/common/logging.h maps ihs::log:: straight
-# onto spdlog:: (identical fmt-style call signatures) instead of hard-failing.
-file(READ ${CMAKE_SOURCE_DIR}/shell/logging/logging.h _ihs_logging_h)
-string(FIND "${_ihs_logging_h}" "namespace ihs::log" _ihs_log_ns_pos)
-if (_ihs_log_ns_pos EQUAL -1)
-    add_compile_definitions(IHS_LOG_SHIM=1)
-endif ()
-
 find_package(PkgConfig REQUIRED)
 
 macro(ENABLE_PLUGIN plugin)
